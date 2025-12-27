@@ -170,6 +170,28 @@ public class MalgachQueryParser {
         return query != null && query.trim().toUpperCase().startsWith("MAMORONA");
     }
     
+    public static boolean isDeleteQuery(String query) {
+        return query != null && query.trim().toUpperCase().startsWith("FAFAO");
+    }
+    
+    public static boolean isShowQuery(String query) {
+        return query != null && query.trim().toUpperCase().startsWith("ASEHOY");
+    }
+    
+    public static boolean isUseQuery(String query) {
+        return query != null && query.trim().toUpperCase().startsWith("AMPIASAO");
+    }
+    
+    public static boolean isUpdateQuery(String query) {
+        return query != null && query.trim().toUpperCase().startsWith("OVAY");
+    }
+    
+    public static boolean isAlterTableQuery(String query) {
+        if (query == null) return false;
+        String upper = query.trim().toUpperCase();
+        return upper.startsWith("AMPIO COLUMN") || upper.startsWith("FAFAO COLUMN");
+    }
+    
     public static CreateCommand parseCreate(String malgachQuery) throws IllegalArgumentException {
         if (malgachQuery == null || malgachQuery.trim().isEmpty()) {
             throw new IllegalArgumentException("Requête vide");
@@ -222,7 +244,8 @@ public class MalgachQueryParser {
         // Format: nom @ attribut1(domaine1) attribut2(domaine2) ...
         // Exemple: Employes @ Age(Integer|0-120|) Name(String||) Salaire(Double|0-100000|)
         
-        int atPos = tableSpec.indexOf("@");
+        String tableSpecUpper = tableSpec.toUpperCase();
+        int atPos = tableSpecUpper.indexOf("@");
         
         String tableName;
         String attributesSpec;
@@ -362,6 +385,341 @@ public class MalgachQueryParser {
         String val = current.toString().trim();
         if (!val.isEmpty()) {
             result.add(val);
+        }
+        
+        return result.toArray(new String[0]);
+    }
+    
+    public static DeleteCommand parseDelete(String malgachQuery) throws IllegalArgumentException {
+        if (malgachQuery == null || malgachQuery.trim().isEmpty()) {
+            throw new IllegalArgumentException("Requête vide");
+        }
+        
+        String query = malgachQuery.trim();
+        String queryUpper = query.toUpperCase();
+        
+        //FAFAO
+        if (!queryUpper.startsWith("FAFAO")) {
+            throw new IllegalArgumentException(
+                "Syntaxe DELETE invalide. Format:\n" +
+                "FAFAO @ nom_table\n" +
+                "FAFAO DATABASE nom_base"
+            );
+        }
+        
+        //@
+        int atPos = queryUpper.indexOf("@");
+        if (atPos == -1) {
+            throw new IllegalArgumentException("Symbole '@' manquant dans la requête DELETE");
+        }
+        
+        //nom après @
+        String target = query.substring(atPos + 1).trim();
+        
+        if (target.isEmpty()) {
+            throw new IllegalArgumentException("Cible manquante après '@'");
+        }
+        
+        return new DeleteCommand(target);
+    }
+    
+    public static ShowCommand parseShowTables(String malgachQuery) throws IllegalArgumentException {
+        if (malgachQuery == null || malgachQuery.trim().isEmpty()) {
+            throw new IllegalArgumentException("Requête vide");
+        }
+        
+        String query = malgachQuery.trim();
+        String queryUpper = query.toUpperCase();
+        
+        //ASEHOY
+        if (!queryUpper.startsWith("ASEHOY")) {
+            throw new IllegalArgumentException(
+                "Syntaxe SHOW invalide. Format:\n" +
+                "ASEHOY TABLE * (pour afficher toutes les tables)\n" +
+                "ASEHOY TABLE nom_table (pour afficher une table spécifique)\n" +
+                "ASEHOY DATABASE * (pour afficher toutes les bases de données)\n" +
+                "ASEHOY DATABASE nom_base (pour afficher une base de données spécifique)\n" +
+                "ASEHOY * (ancienne syntaxe pour afficher toutes les tables)"
+            );
+        }
+        
+        // Extraire le type et la cible
+        String[] parts = query.substring(6).trim().split("\\s+", 2); // 6 = longueur de "ASEHOY"
+        
+        if (parts.length == 1) {
+            // Ancienne syntaxe: ASEHOY *
+            String target = parts[0].trim();
+            if (target.equals("*")) {
+                return new ShowCommand("TABLE", "*");
+            } else {
+                return new ShowCommand("TABLE", target);
+            }
+        } else if (parts.length == 2) {
+            // Nouvelle syntaxe: ASEHOY TABLE * ou ASEHOY DATABASE *
+            String type = parts[0].toUpperCase(); // TABLE ou DATABASE
+            String target = parts[1].trim();
+            
+            if (target.isEmpty()) {
+                throw new IllegalArgumentException("Cible manquante après 'ASEHOY " + type + "'");
+            }
+            
+            return new ShowCommand(type, target);
+        } else {
+            throw new IllegalArgumentException("Syntaxe ASEHOY invalide");
+        }
+    }
+    
+    public static String parseUse(String malgachQuery) throws IllegalArgumentException {
+        if (malgachQuery == null || malgachQuery.trim().isEmpty()) {
+            throw new IllegalArgumentException("Requête vide");
+        }
+        
+        String query = malgachQuery.trim();
+        String queryUpper = query.toUpperCase();
+        
+        //AMPIASAO
+        if (!queryUpper.startsWith("AMPIASAO")) {
+            throw new IllegalArgumentException(
+                "Syntaxe USE invalide. Format:\n" +
+                "AMPIASAO nom_base_de_données"
+            );
+        }
+        
+        // Extraire le nom de la base de données après AMPIASAO
+        String dbName = query.substring(8).trim(); // 8 = longueur de "AMPIASAO"
+        
+        if (dbName.isEmpty()) {
+            throw new IllegalArgumentException("Nom de la base de données manquant après 'AMPIASAO'");
+        }
+        
+        return dbName;
+    }
+    
+    public static UpdateCommand parseUpdate(String malgachQuery) throws IllegalArgumentException {
+        if (malgachQuery == null || malgachQuery.trim().isEmpty()) {
+            throw new IllegalArgumentException("Requête vide");
+        }
+        
+        String query = malgachQuery.trim();
+        String queryUpper = query.toUpperCase();
+        
+        // OVAY
+        if (!queryUpper.startsWith("OVAY")) {
+            throw new IllegalArgumentException(
+                "Syntaxe UPDATE invalide. Format:\n" +
+                "OVAY @ table AMBOARY colonne1 = valeur1, colonne2 = valeur2 RAHA condition\n" +
+                "Exemple: OVAY @ Employes AMBOARY salaire = 50000 RAHA age > 30"
+            );
+        }
+        
+        // @
+        int atPos = queryUpper.indexOf("@");
+        if (atPos == -1) {
+            throw new IllegalArgumentException("Symbole '@' manquant dans la requête UPDATE");
+        }
+        
+        // après @
+        String afterAt = query.substring(atPos + 1).trim();
+        
+        // AMBOARY
+        int amboaryPos = afterAt.toUpperCase().indexOf("AMBOARY");
+        if (amboaryPos == -1) {
+            throw new IllegalArgumentException("Mot-clé 'AMBOARY' manquant");
+        }
+        
+        String tableStr = afterAt.substring(0, amboaryPos).trim();
+        String afterAmboary = afterAt.substring(amboaryPos + 8).trim();
+        
+        if (tableStr.isEmpty()) {
+            throw new IllegalArgumentException("Nom de la table manquant");
+        }
+        
+        // RAHA pour la condition
+        int rahaPos = afterAmboary.toUpperCase().indexOf("RAHA");
+        String setStr, condition = null;
+        
+        if (rahaPos != -1) {
+            setStr = afterAmboary.substring(0, rahaPos).trim();
+            condition = afterAmboary.substring(rahaPos + 4).trim();
+            if (condition.isEmpty()) {
+                condition = null;
+            }
+        } else {
+            setStr = afterAmboary;
+        }
+        
+        if (setStr.isEmpty()) {
+            throw new IllegalArgumentException("Clause AMBOARY vide");
+        }
+        
+        // Parser les affectations colonne=valeur
+        String[] assignments = parseAssignments(setStr);
+        String[] colonnes = new String[assignments.length / 2];
+        String[] valeurs = new String[assignments.length / 2];
+        
+        for (int i = 0; i < assignments.length; i += 2) {
+            colonnes[i / 2] = assignments[i];
+            valeurs[i / 2] = assignments[i + 1];
+        }
+        
+        return new UpdateCommand(tableStr, colonnes, valeurs, condition);
+    }
+    
+    public static AlterTableCommand parseAlterTable(String malgachQuery) throws IllegalArgumentException {
+        if (malgachQuery == null || malgachQuery.trim().isEmpty()) {
+            throw new IllegalArgumentException("Requête vide");
+        }
+        
+        String query = malgachQuery.trim();
+        String queryUpper = query.toUpperCase();
+        
+        if (queryUpper.startsWith("AMPIO COLUMN")) {
+            return parseAddColumn(query);
+        } else if (queryUpper.startsWith("FAFAO COLUMN")) {
+            return parseDropColumn(query);
+        } else {
+            throw new IllegalArgumentException(
+                "Syntaxe ALTER TABLE invalide. Format:\n" +
+                "AMPIO COLUMN @ table nom_colonne(domaine)\n" +
+                "FAFAO COLUMN @ table nom_colonne"
+            );
+        }
+    }
+    
+    private static AlterTableCommand parseAddColumn(String query) throws IllegalArgumentException {
+        String queryUpper = query.toUpperCase();
+        
+        // @
+        int atPos = queryUpper.indexOf("@");
+        if (atPos == -1) {
+            throw new IllegalArgumentException("Symbole '@' manquant dans la requête ADD COLUMN");
+        }
+        
+        String afterAt = query.substring(atPos + 1).trim();
+        
+        // Premier espace pour séparer le nom de la table de la colonne
+        int spacePos = afterAt.indexOf(" ");
+        if (spacePos == -1) {
+            throw new IllegalArgumentException("Format invalide: nom de colonne manquant");
+        }
+        
+        String tableStr = afterAt.substring(0, spacePos).trim();
+        String columnSpec = afterAt.substring(spacePos).trim();
+        
+        if (tableStr.isEmpty()) {
+            throw new IllegalArgumentException("Nom de la table manquant");
+        }
+        
+        if (columnSpec.isEmpty()) {
+            throw new IllegalArgumentException("Spécification de colonne manquante");
+        }
+        
+        // Parser la colonne avec son domaine
+        int parenOpenPos = columnSpec.indexOf("(");
+        int parenClosePos = columnSpec.lastIndexOf(")");
+        
+        if (parenOpenPos == -1 || parenClosePos == -1 || parenClosePos <= parenOpenPos) {
+            throw new IllegalArgumentException("Format de colonne invalide: " + columnSpec + " (doit être: nom(domaine))");
+        }
+        
+        String columnName = columnSpec.substring(0, parenOpenPos).trim();
+        String domainSpec = columnSpec.substring(parenOpenPos + 1, parenClosePos).trim();
+        
+        if (columnName.isEmpty()) {
+            throw new IllegalArgumentException("Nom de colonne vide");
+        }
+        
+        if (domainSpec.isEmpty()) {
+            throw new IllegalArgumentException("Domaine vide pour la colonne: " + columnName);
+        }
+        
+        // Créer l'attribut avec son domaine
+        Domaine domaine = Domaine.deserialize(columnName, domainSpec);
+        Attribut attribut = new Attribut(columnName, domaine);
+        
+        return new AlterTableCommand(AlterTableCommand.TYPE_ADD_COLUMN, tableStr, columnName, attribut);
+    }
+    
+    private static AlterTableCommand parseDropColumn(String query) throws IllegalArgumentException {
+        String queryUpper = query.toUpperCase();
+        
+        // @
+        int atPos = queryUpper.indexOf("@");
+        if (atPos == -1) {
+            throw new IllegalArgumentException("Symbole '@' manquant dans la requête DROP COLUMN");
+        }
+        
+        String afterAt = query.substring(atPos + 1).trim();
+        
+        // Premier espace pour séparer le nom de la table de la colonne
+        int spacePos = afterAt.indexOf(" ");
+        if (spacePos == -1) {
+            throw new IllegalArgumentException("Format invalide: nom de colonne manquant");
+        }
+        
+        String tableStr = afterAt.substring(0, spacePos).trim();
+        String columnName = afterAt.substring(spacePos).trim();
+        
+        if (tableStr.isEmpty()) {
+            throw new IllegalArgumentException("Nom de la table manquant");
+        }
+        
+        if (columnName.isEmpty()) {
+            throw new IllegalArgumentException("Nom de la colonne manquant");
+        }
+        
+        return new AlterTableCommand(AlterTableCommand.TYPE_DROP_COLUMN, tableStr, columnName);
+    }
+    
+    private static String[] parseAssignments(String assignmentsStr) throws IllegalArgumentException {
+        java.util.List<String> result = new java.util.ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        char quoteChar = '\0';
+        
+        for (int i = 0; i < assignmentsStr.length(); i++) {
+            char c = assignmentsStr.charAt(i);
+            
+            // guillemets
+            if ((c == '"' || c == '\'') && (i == 0 || assignmentsStr.charAt(i - 1) != '\\')) {
+                if (!inQuotes) {
+                    inQuotes = true;
+                    quoteChar = c;
+                } else if (c == quoteChar) {
+                    inQuotes = false;
+                    quoteChar = '\0';
+                } else {
+                    current.append(c);
+                }
+            }
+            // virgules en dehors des quotes
+            else if (c == ',' && !inQuotes) {
+                String assignment = current.toString().trim();
+                if (!assignment.isEmpty()) {
+                    String[] parts = assignment.split("=", 2);
+                    if (parts.length != 2) {
+                        throw new IllegalArgumentException("Format d'affectation invalide: " + assignment + " (doit être: colonne=valeur)");
+                    }
+                    result.add(parts[0].trim());
+                    result.add(parts[1].trim());
+                }
+                current = new StringBuilder();
+            }
+            // ajouter les autres caractères
+            else {
+                current.append(c);
+            }
+        }
+        
+        // ajouter la dernière affectation
+        String assignment = current.toString().trim();
+        if (!assignment.isEmpty()) {
+            String[] parts = assignment.split("=", 2);
+            if (parts.length != 2) {
+                throw new IllegalArgumentException("Format d'affectation invalide: " + assignment + " (doit être: colonne=valeur)");
+            }
+            result.add(parts[0].trim());
+            result.add(parts[1].trim());
         }
         
         return result.toArray(new String[0]);

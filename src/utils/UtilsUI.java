@@ -112,4 +112,75 @@ public class UtilsUI {
         textArea.setTabSize(4);
         return textArea;
     }
+    
+    public static JPanel createQueryPanel() {
+        JPanel queryPanel = new JPanel(new BorderLayout(0, 5));
+        queryPanel.setBackground(new Color(245, 247, 250));
+        queryPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 10, 15));
+        
+        JLabel queryLabel = new JLabel("Requête SQL Malgache:");
+        queryLabel.setFont(new Font("Segoe UI", Font.BOLD, 12));
+        queryLabel.setForeground(new Color(50, 100, 150));
+        queryPanel.add(queryLabel, BorderLayout.NORTH);
+        
+        return queryPanel;
+    }
+    
+    public static JScrollPane createQueryScrollPane(JTextArea sqlTextArea) {
+        JScrollPane scrollPane = scrollPane(sqlTextArea);
+        scrollPane.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 210, 220), 2),
+            BorderFactory.createEmptyBorder(2, 2, 2, 2)
+        ));
+        scrollPane.setPreferredSize(new Dimension(850, 120));
+        return scrollPane;
+    }
+    
+    public static JPanel createResultsPanel() {
+        JPanel resultsPanel = new JPanel(new BorderLayout());
+        resultsPanel.setBackground(new Color(245, 247, 250));
+        resultsPanel.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createTitledBorder(BorderFactory.createLineBorder(new Color(200, 210, 220)), "Results"),
+            BorderFactory.createEmptyBorder(8, 8, 8, 8)
+        ));
+        
+        JLabel resultsPlaceholder = new JLabel("Mipoitra eto ny valiny. Andramo anie e");
+        resultsPlaceholder.setForeground(new Color(150, 150, 150));
+        resultsPlaceholder.setHorizontalAlignment(JLabel.CENTER);
+        resultsPlaceholder.setFont(new Font("Segoe UI", Font.ITALIC, 14));
+        
+        resultsPanel.add(resultsPlaceholder, BorderLayout.CENTER);
+        return resultsPanel;
+    }
+    
+    public static JPanel createDatabasePanel(JLabel databaseLabel) {
+        JPanel databasePanel = new JPanel(new BorderLayout());
+        databasePanel.setBackground(new Color(240, 248, 255));
+        databasePanel.setBorder(BorderFactory.createTitledBorder("Base de données active"));
+        databasePanel.add(databaseLabel, BorderLayout.CENTER);
+        return databasePanel;
+    }
+    
+    public static JPanel createSouthPanel(JButton executeButton, JLabel statusLabel, JLabel databaseLabel) {
+        JPanel southPanel = new JPanel(new BorderLayout(15, 0));
+        southPanel.setBackground(new Color(250, 250, 252));
+        southPanel.setBorder(BorderFactory.createMatteBorder(1, 0, 0, 0, new Color(200, 210, 220)));
+        southPanel.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+        
+        JPanel buttonsPanel = new JPanel();
+        buttonsPanel.setBackground(new Color(250, 250, 252));
+        buttonsPanel.add(executeButton);
+        
+        JPanel statusPanel = new JPanel(new BorderLayout(10, 0));
+        statusPanel.setBackground(new Color(250, 250, 252));
+        statusPanel.add(statusLabel, BorderLayout.EAST);
+        
+        JPanel databasePanel = createDatabasePanel(databaseLabel);
+        
+        southPanel.add(buttonsPanel, BorderLayout.WEST);
+        southPanel.add(databasePanel, BorderLayout.CENTER);
+        southPanel.add(statusPanel, BorderLayout.EAST);
+        
+        return southPanel;
+    }
 }

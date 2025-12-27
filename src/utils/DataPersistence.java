@@ -25,7 +25,11 @@ public class DataPersistence {
     }
     
     public void saveInsert(String table, String[] colonnes, String[] valeurs) {
-        String filename = DATA_DIR + File.separator + table + ".txt";
+        saveInsert(table, colonnes, valeurs, "data");
+    }
+    
+    public void saveInsert(String table, String[] colonnes, String[] valeurs, String databasePath) {
+        String filename = databasePath + java.io.File.separator + table + ".txt";
         try {
             StringBuilder line = new StringBuilder();
             for (int i = 0; i < valeurs.length; i++) {
@@ -47,30 +51,42 @@ public class DataPersistence {
     }
     
     public void createTableSchema(String table, String[] colonnes) {
-        String filename = DATA_DIR + File.separator + table + "_schema.txt";
+        createTableSchema(table, colonnes, "data");
+    }
+    
+    public void createTableSchema(String table, String[] colonnes, String databasePath) {
+        String filename = databasePath + java.io.File.separator + table + "_schema.txt";
         try {
             String header = String.join("|", colonnes);
             Files.write(Paths.get(filename), (header + "\n").getBytes());
-            System.out.println("[Persistence] Schéma créé pour " + table);
+            System.out.println("[Persistence] Schéma créé pour " + table + " dans " + databasePath);
         } catch (IOException e) {
             System.err.println("Erreur création schéma: " + e.getMessage());
         }
     }
     
     public void createTableSchema(String table, String[] colonnes, String[] types) {
-        String filename = DATA_DIR + File.separator + table + "_schema.txt";
+        createTableSchema(table, colonnes, types, "data");
+    }
+    
+    public void createTableSchema(String table, String[] colonnes, String[] types, String databasePath) {
+        String filename = databasePath + java.io.File.separator + table + "_schema.txt";
         try {
             String header = String.join("|", colonnes);
             String typeRow = String.join("|", types);
             Files.write(Paths.get(filename), (header + "\n" + typeRow + "\n").getBytes());
-            System.out.println("[Persistence] Schéma créé pour " + table + " avec types");
+            System.out.println("[Persistence] Schéma créé pour " + table + " avec types dans " + databasePath);
         } catch (IOException e) {
             System.err.println("Erreur création schéma: " + e.getMessage());
         }
     }
     
     public void createTableSchemaWithDomains(String table, model.Attribut[] attributs) {
-        String filename = DATA_DIR + File.separator + table + "_schema.txt";
+        createTableSchemaWithDomains(table, attributs, "data");
+    }
+    
+    public void createTableSchemaWithDomains(String table, model.Attribut[] attributs, String databasePath) {
+        String filename = databasePath + java.io.File.separator + table + "_schema.txt";
         try {
             StringBuilder header = new StringBuilder();
             StringBuilder domains = new StringBuilder();
@@ -85,7 +101,7 @@ public class DataPersistence {
             }
             
             Files.write(Paths.get(filename), (header.toString() + "\n" + domains.toString() + "\n").getBytes());
-            System.out.println("[Persistence] Schéma créé pour " + table + " avec domaines complets");
+            System.out.println("[Persistence] Schéma créé pour " + table + " avec domaines complets dans " + databasePath);
         } catch (IOException e) {
             System.err.println("Erreur création schéma: " + e.getMessage());
         }
@@ -106,31 +122,66 @@ public class DataPersistence {
     }
     
     public void createTable(String tableName) {
+        createTable(tableName, "data");
+    }
+    
+    public void createTable(String tableName, String databasePath) {
         try {
-            String tableFile = DATA_DIR + File.separator + tableName + ".txt";
+            String tableFile = databasePath + java.io.File.separator + tableName + ".txt";
             if (!Files.exists(Paths.get(tableFile))) {
                 Files.createFile(Paths.get(tableFile));
-                System.out.println("[Persistence] Table créée: " + tableName);
+                System.out.println("[Persistence] Table créée: " + tableName + " dans " + databasePath);
             } else {
-                System.out.println("[Persistence] Table existante: " + tableName);
+                System.out.println("[Persistence] Table existante: " + tableName + " dans " + databasePath);
             }
         } catch (IOException e) {
             System.err.println("Erreur création table: " + e.getMessage());
         }
     }
     
-    public Relation loadRelationFromFile(String tableName) {
+    public Path findFileInDatabaseIgnoreCase(String fileName, String databasePath) {
         try {
-            String schemaFile = DATA_DIR + File.separator + tableName + "_schema.txt";
-            String dataFile = DATA_DIR + File.separator + tableName + ".txt";
+            Path dir = Paths.get(databasePath);
+            if (!Files.exists(dir)) {
+                return null;
+            }
             
-            if (!Files.exists(Paths.get(schemaFile))) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
+                for (Path path : stream) {
+                    if (path.getFileName().toString().equalsIgnoreCase(fileName)) {
+                        return path;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Erreur recherche fichier " + fileName + ": " + e.getMessage());
+        }
+        return null;
+    }
+    
+    public Path findFileIgnoreCase(String fileName) {
+        return findFileInDatabaseIgnoreCase(fileName, "data");
+    }
+    
+    public Relation loadRelationFromFile(String tableName) {
+        return loadRelationFromFile(tableName, "data");
+    }
+    
+    public Relation loadRelationFromFile(String tableName, String databasePath) {
+        try {
+            String schemaFileName = tableName + "_schema.txt";
+            String dataFileName = tableName + ".txt";
+            
+            Path schemaPath = findFileInDatabaseIgnoreCase(schemaFileName, databasePath);
+            Path dataPath = findFileInDatabaseIgnoreCase(dataFileName, databasePath);
+            
+            if (schemaPath == null) {
                 System.err.println("[Persistence] Schéma non trouvé pour " + tableName);
                 return null;
             }
             
             // Lire le schéma
-            List<String> schemaLines = Files.readAllLines(Paths.get(schemaFile));
+            List<String> schemaLines = Files.readAllLines(schemaPath);
             if (schemaLines.size() < 1) {
                 System.err.println("[Persistence] Schéma vide pour " + tableName);
                 return null;
@@ -154,8 +205,8 @@ public class DataPersistence {
             Relation relation = new Relation(tableName, attributs);
             
             // Charger les données si le fichier existe
-            if (Files.exists(Paths.get(dataFile))) {
-                List<String> dataLines = Files.readAllLines(Paths.get(dataFile));
+            if (dataPath != null) {
+                List<String> dataLines = Files.readAllLines(dataPath);
                 for (String line : dataLines) {
                     if (line.trim().isEmpty()) continue;
                     
@@ -205,38 +256,87 @@ public class DataPersistence {
     }
     
     public List<String> getAllTableNames() {
+        return getAllTableNamesFromDatabase("data");
+    }
+    
+    public List<String> getAllTableNamesFromDatabase(String databasePath) {
         List<String> tableNames = new ArrayList<>();
         try {
-            Path dataPath = Paths.get(DATA_DIR);
+            Path dataPath = Paths.get(databasePath);
             if (!Files.exists(dataPath)) {
                 return tableNames;
             }
             
-            // Lister tous les fichiers .txt dans le répertoire data/
-            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dataPath, "*.txt")) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(dataPath)) {
                 for (Path path : stream) {
-                    String filename = path.getFileName().toString();
-                    
-                    // Exclure les fichiers _schema.txt et chercher les fichiers de données
-                    if (!filename.endsWith("_schema.txt") && !filename.endsWith(".meta")) {
-                        // Extraire le nom de la table (sans l'extension .txt)
-                        String tableName = filename.substring(0, filename.length() - 4);
+                    String fileName = path.getFileName().toString();
+                    if (Files.isRegularFile(path) && fileName.endsWith(".txt") && !fileName.endsWith("_schema.txt")) {
+                        String tableName = fileName.substring(0, fileName.length() - 4);
                         tableNames.add(tableName);
                     }
                 }
             }
         } catch (IOException e) {
-            System.err.println("Erreur listing tables: " + e.getMessage());
+            System.err.println("Erreur lecture répertoire " + databasePath + ": " + e.getMessage());
         }
         return tableNames;
     }
     
+    public String deleteTable(String tableName) {
+        return deleteTable(tableName, "data");
+    }
+    
+    public String deleteTable(String tableName, String databasePath) {
+        try {
+            boolean dataDeleted = false;
+            boolean schemaDeleted = false;
+            
+            String dataFileName = tableName + ".txt";
+            Path dataPath = findFileInDatabaseIgnoreCase(dataFileName, databasePath);
+            if (dataPath != null) {
+                Files.delete(dataPath);
+                dataDeleted = true;
+                System.out.println("[Persistence] Fichier de données supprimé: " + dataPath);
+            }
+            
+            String schemaFileName = tableName + "_schema.txt";
+            Path schemaPath = findFileInDatabaseIgnoreCase(schemaFileName, databasePath);
+            if (schemaPath != null) {
+                Files.delete(schemaPath);
+                schemaDeleted = true;
+                System.out.println("[Persistence] Fichier de schéma supprimé: " + schemaPath);
+            }
+            
+            String message;
+            if (dataDeleted && schemaDeleted) {
+                message = "Table '" + tableName + "' supprimée avec succès (fichiers de données et schéma)";
+            } else if (dataDeleted) {
+                message = "Table '" + tableName + "' supprimée (fichier de données uniquement)";
+            } else if (schemaDeleted) {
+                message = "Table '" + tableName + "' supprimée (fichier de schéma uniquement)";
+            } else {
+                message = "Aucun fichier trouvé pour la table '" + tableName + "'";
+            }
+            
+            System.out.println("[Persistence] " + message);
+            return message;
+        } catch (IOException e) {
+            String errorMsg = "Erreur suppression table '" + tableName + "': " + e.getMessage();
+            System.err.println(errorMsg);
+            return errorMsg;
+        }
+    }
+    
     public Map<String, Relation> loadAllTables() {
+        return loadAllTablesFromDatabase("data");
+    }
+    
+    public Map<String, Relation> loadAllTablesFromDatabase(String databasePath) {
         Map<String, Relation> tables = new HashMap<>();
-        List<String> tableNames = getAllTableNames();
+        List<String> tableNames = getAllTableNamesFromDatabase(databasePath);
         
         for (String tableName : tableNames) {
-            Relation relation = loadRelationFromFile(tableName);
+            Relation relation = loadRelationFromFile(tableName, databasePath);
             if (relation != null) {
                 tables.put(tableName, relation);
                 System.out.println("[DataPersistence] Table chargée: " + tableName);

@@ -1,4 +1,5 @@
 package model;
+
 public class Relation {
     String nom;
     Attribut[] attributs;
@@ -377,5 +378,105 @@ public class Relation {
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    public boolean hasAttribute(String nomAttr) {
+        for (Attribut attr : attributs) {
+            if (attr.getNom().equalsIgnoreCase(nomAttr)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    public void addAttribute(Attribut nouvelAttribut) {
+        Attribut[] nouveauxAttributs = new Attribut[attributs.length + 1];
+        System.arraycopy(attributs, 0, nouveauxAttributs, 0, attributs.length);
+        nouveauxAttributs[attributs.length] = nouvelAttribut;
+        this.attributs = nouveauxAttributs;
+        
+        for (int i = 0; i < nbTuples; i++) {
+            Object[] nouveauTuple = new Object[tuples[i].length + 1];
+            System.arraycopy(tuples[i], 0, nouveauTuple, 0, tuples[i].length);
+            nouveauTuple[tuples[i].length] = null; 
+            tuples[i] = nouveauTuple;
+        }
+    }
+    
+    public void removeAttribute(String nomAttr) {
+        int indexToRemove = -1;
+        for (int i = 0; i < attributs.length; i++) {
+            if (attributs[i].getNom().equalsIgnoreCase(nomAttr)) {
+                indexToRemove = i;
+                break;
+            }
+        }
+        
+        if (indexToRemove == -1) {
+            throw new IllegalArgumentException("Attribut '" + nomAttr + "' introuvable");
+        }
+        
+        Attribut[] nouveauxAttributs = new Attribut[attributs.length - 1];
+        System.arraycopy(attributs, 0, nouveauxAttributs, 0, indexToRemove);
+        System.arraycopy(attributs, indexToRemove + 1, nouveauxAttributs, indexToRemove, attributs.length - indexToRemove - 1);
+        this.attributs = nouveauxAttributs;
+        
+        for (int i = 0; i < nbTuples; i++) {
+            Object[] nouveauTuple = new Object[tuples[i].length - 1];
+            System.arraycopy(tuples[i], 0, nouveauTuple, 0, indexToRemove);
+            System.arraycopy(tuples[i], indexToRemove + 1, nouveauTuple, indexToRemove, tuples[i].length - indexToRemove - 1);
+            tuples[i] = nouveauTuple;
+        }
+    }
+    
+    public void updateTuples(String[] colonnes, Object[] valeurs, String condition) {
+        int[] indices = new int[colonnes.length];
+        for (int i = 0; i < colonnes.length; i++) {
+            indices[i] = -1;
+            for (int j = 0; j < attributs.length; j++) {
+                if (attributs[j].getNom().equalsIgnoreCase(colonnes[i])) {
+                    indices[i] = j;
+                    break;
+                }
+            }
+            if (indices[i] == -1) {
+                throw new IllegalArgumentException("Colonne '" + colonnes[i] + "' introuvable");
+            }
+        }
+        
+        for (int i = 0; i < nbTuples; i++) {
+            if (evaluer(condition, tuples[i])) {
+                for (int j = 0; j < indices.length; j++) {
+                    tuples[i][indices[j]] = valeurs[j];
+                }
+            }
+        }
+    }
+    
+    public void updateAllTuples(String[] colonnes, Object[] valeurs) {
+        int[] indices = new int[colonnes.length];
+        for (int i = 0; i < colonnes.length; i++) {
+            indices[i] = -1;
+            for (int j = 0; j < attributs.length; j++) {
+                if (attributs[j].getNom().equalsIgnoreCase(colonnes[i])) {
+                    indices[i] = j;
+                    break;
+                }
+            }
+            if (indices[i] == -1) {
+                throw new IllegalArgumentException("Colonne '" + colonnes[i] + "' introuvable");
+            }
+        }
+        
+        // Mettre à jour tous les tuples
+        for (int i = 0; i < nbTuples; i++) {
+            for (int j = 0; j < indices.length; j++) {
+                tuples[i][indices[j]] = valeurs[j];
+            }
+        }
+    }
+    
+    public String getNom() {
+        return nom;
     }
 }

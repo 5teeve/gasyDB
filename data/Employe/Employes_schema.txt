@@ -1,0 +1,2 @@
+Age|Name|Salaire
+Integer|0-120||String|||Double|0.0-100000.0|

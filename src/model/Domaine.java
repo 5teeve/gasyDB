@@ -204,10 +204,6 @@ public class Domaine {
         return sb.toString();
     }
     
-    /**
-     * Crée un Domaine depuis une spécification sérialisée
-     * Format: typeName|range|enumValues
-     */
     public static Domaine deserialize(String nomAttribut, String spec) {
         String[] parts = spec.split("\\|");
         
