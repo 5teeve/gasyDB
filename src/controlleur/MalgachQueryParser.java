@@ -4,6 +4,12 @@ import model.Attribut;
 import model.Domaine;
 
 public class MalgachQueryParser {
+    private static service.DomaineService domaineService;
+    
+    public static void setDomaineService(service.DomaineService service) {
+        domaineService = service;
+    }
+    
     public static QueryCommand parseSelect(String malgachQuery) throws IllegalArgumentException {
         if (malgachQuery == null || malgachQuery.trim().isEmpty()) {
             throw new IllegalArgumentException("Requête vide");
@@ -12,7 +18,6 @@ public class MalgachQueryParser {
         String query = malgachQuery.trim();
         String queryUpper = query.toUpperCase();
         
-        //ALAIVO
         if (!queryUpper.startsWith("ALAIVO")) {
             throw new IllegalArgumentException(
                 "Syntaxe SELECT invalide. Format:\n" +
@@ -21,22 +26,18 @@ public class MalgachQueryParser {
             );
         }
         
-        //@
-        int atPos = queryUpper.indexOf("@");
+                int atPos = queryUpper.indexOf("@");
         if (atPos == -1) {
             throw new IllegalArgumentException("Symbole '@' manquant dans la requête SELECT");
         }
         
-        //colonnes(entre alaivo et @)
         String colonnesStr = query.substring(6, atPos).trim();
         if (colonnesStr.isEmpty()) {
             throw new IllegalArgumentException("Paramètre 'colonnes' manquant");
         }
         
-        //apres @
         String afterAt = query.substring(atPos + 1).trim();
         
-        //RAHA
         int rahaPos = afterAt.toUpperCase().indexOf("RAHA");
         String tableStr, condition = null;
         
@@ -54,7 +55,6 @@ public class MalgachQueryParser {
             throw new IllegalArgumentException("Nom de la table manquant");
         }
         
-        // Traiter les colonnes
         String[] colonnes;
         if (colonnesStr.equals("*")) {
             colonnes = new String[]{"*"};
@@ -73,7 +73,6 @@ public class MalgachQueryParser {
         String query = malgachQuery.trim();
         String queryUpper = query.toUpperCase();
         
-        // AMPIDIRO
         if (!queryUpper.startsWith("AMPIDIRO")) {
             throw new IllegalArgumentException(
                 "Syntaxe INSERT invalide. Format:\n" +
@@ -84,16 +83,13 @@ public class MalgachQueryParser {
             );
         }
         
-        //@
-        int atPos = queryUpper.indexOf("@");
+                int atPos = queryUpper.indexOf("@");
         if (atPos == -1) {
             throw new IllegalArgumentException("Symbole '@' manquant");
         }
         
-        // apres le @
         String afterAt = query.substring(atPos + 1).trim();
         
-        // Chercher IRETO pour séparer la partie table/colonnes de la partie valeurs
         String afterAtUpper = afterAt.toUpperCase();
         int iretoPos = afterAtUpper.indexOf("IRETO");
         if (iretoPos == -1) {
@@ -103,17 +99,14 @@ public class MalgachQueryParser {
         String tableAndCols = afterAt.substring(0, iretoPos).trim();
         String afterIreto = afterAt.substring(iretoPos + 5).trim();
         
-        // Parser la table et les colonnes optionnelles
         String tableStr;
         String[] colonnes = null;
         
         int parenPos = tableAndCols.indexOf("(");
         
         if (parenPos == -1) {
-            // Pas de colonnes spécifiées
             tableStr = tableAndCols;
         } else {
-            // Colonnes spécifiées entre parenthèses
             int closeParenPos = tableAndCols.indexOf(")");
             if (closeParenPos == -1) {
                 throw new IllegalArgumentException("Parenthèse fermante ')' manquante après colonnes");
@@ -192,6 +185,12 @@ public class MalgachQueryParser {
         return upper.startsWith("AMPIO COLUMN") || upper.startsWith("FAFAO COLUMN");
     }
     
+    public static boolean isCreateDomaineQuery(String query) {
+        if (query == null) return false;
+        String upper = query.trim().toUpperCase();
+        return upper.startsWith("MAMORONA DOMAINE");
+    }
+    
     public static CreateCommand parseCreate(String malgachQuery) throws IllegalArgumentException {
         if (malgachQuery == null || malgachQuery.trim().isEmpty()) {
             throw new IllegalArgumentException("Requête vide");
@@ -267,7 +266,6 @@ public class MalgachQueryParser {
             throw new IllegalArgumentException("Attributs manquants après @");
         }
         
-        // Parser les attributs et leurs domaines
         java.util.List<Attribut> attributsList = parseAttributes(attributesSpec);
         Attribut[] attributs = attributsList.toArray(new Attribut[0]);
         
@@ -280,7 +278,6 @@ public class MalgachQueryParser {
         StringBuilder current = new StringBuilder();
         int parenCount = 0;
         
-        // Découper par espaces mais en respectant les parenthèses
         for (int i = 0; i < attributesSpec.length(); i++) {
             char c = attributesSpec.charAt(i);
             
@@ -304,13 +301,12 @@ public class MalgachQueryParser {
             parts.add(current.toString());
         }
         
-        // Parser chaque attribut(domaine)
         for (String part : parts) {
             int parenOpenPos = part.indexOf("(");
             int parenClosePos = part.lastIndexOf(")");
             
             if (parenOpenPos == -1 || parenClosePos == -1 || parenClosePos <= parenOpenPos) {
-                throw new IllegalArgumentException("Format attribut invalide: " + part + " (doit être: nom(domaine))");
+                throw new IllegalArgumentException("Format attribut invalide: " + part + " (doit être: nom(domaine) ou nom(nomDomaine))");
             }
             
             String attrName = part.substring(0, parenOpenPos).trim();
@@ -324,8 +320,19 @@ public class MalgachQueryParser {
                 throw new IllegalArgumentException("Domaine vide pour l'attribut: " + attrName);
             }
             
-            // Parser la spécification de domaine et créer l'Attribut
-            Domaine domaine = Domaine.deserialize(attrName, domainSpec);
+            Domaine domaine;
+            
+            if (!domainSpec.contains("|")) {
+                if (domaineService != null && domaineService.domaineExists(domainSpec)) {
+                    domaine = domaineService.getDomaine(domainSpec);
+                    domaine = new Domaine(attrName, domaine.getType(), domaine.getMin(), domaine.getMax(), domaine.getValeursPossibles());
+                } else {
+                    throw new IllegalArgumentException("Domaine nommé '" + domainSpec + "' non trouvé. Créez-le d'abord avec MAMORONA DOMAINE.");
+                }
+            } else {
+                domaine = Domaine.deserialize(attrName, domainSpec);
+            }
+            
             Attribut attr = new Attribut(attrName, domaine);
             attributs.add(attr);
         }
@@ -333,8 +340,7 @@ public class MalgachQueryParser {
         return attributs;
     }
     
-    // pour parser une liste séparée par des virgules
-    private static String[] parseList(String list) {
+        private static String[] parseList(String list) {
         String[] items = list.split(",");
         for (int i = 0; i < items.length; i++) {
             items[i] = items[i].trim();
@@ -345,8 +351,7 @@ public class MalgachQueryParser {
         return items;
     }
     
-    //pour parser les valeurs (gère les quoted strings)
-    private static String[] parseValues(String values) {
+        private static String[] parseValues(String values) {
         java.util.List<String> result = new java.util.ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inQuotes = false;
@@ -355,8 +360,7 @@ public class MalgachQueryParser {
         for (int i = 0; i < values.length(); i++) {
             char c = values.charAt(i);
             
-            // guillemets
-            if ((c == '"' || c == '\'') && (i == 0 || values.charAt(i - 1) != '\\')) {
+                        if ((c == '"' || c == '\'') && (i == 0 || values.charAt(i - 1) != '\\')) {
                 if (!inQuotes) {
                     inQuotes = true;
                     quoteChar = c;
@@ -367,22 +371,19 @@ public class MalgachQueryParser {
                     current.append(c);
                 }
             } 
-            // virgules en dehors des quotes
-            else if (c == ',' && !inQuotes) {
+                        else if (c == ',' && !inQuotes) {
                 String val = current.toString().trim();
                 if (!val.isEmpty()) {
                     result.add(val);
                 }
                 current = new StringBuilder();
             } 
-            // ajouter les autres caractères
-            else {
+                        else {
                 current.append(c);
             }
         }
 
-        // ajouter la dernière valeur
-        String val = current.toString().trim();
+                String val = current.toString().trim();
         if (!val.isEmpty()) {
             result.add(val);
         }
@@ -398,7 +399,6 @@ public class MalgachQueryParser {
         String query = malgachQuery.trim();
         String queryUpper = query.toUpperCase();
         
-        //FAFAO
         if (!queryUpper.startsWith("FAFAO")) {
             throw new IllegalArgumentException(
                 "Syntaxe DELETE invalide. Format:\n" +
@@ -407,13 +407,11 @@ public class MalgachQueryParser {
             );
         }
         
-        //@
-        int atPos = queryUpper.indexOf("@");
+                int atPos = queryUpper.indexOf("@");
         if (atPos == -1) {
             throw new IllegalArgumentException("Symbole '@' manquant dans la requête DELETE");
         }
         
-        //nom après @
         String target = query.substring(atPos + 1).trim();
         
         if (target.isEmpty()) {
@@ -431,7 +429,6 @@ public class MalgachQueryParser {
         String query = malgachQuery.trim();
         String queryUpper = query.toUpperCase();
         
-        //ASEHOY
         if (!queryUpper.startsWith("ASEHOY")) {
             throw new IllegalArgumentException(
                 "Syntaxe SHOW invalide. Format:\n" +
@@ -439,15 +436,14 @@ public class MalgachQueryParser {
                 "ASEHOY TABLE nom_table (pour afficher une table spécifique)\n" +
                 "ASEHOY DATABASE * (pour afficher toutes les bases de données)\n" +
                 "ASEHOY DATABASE nom_base (pour afficher une base de données spécifique)\n" +
+                "ASEHOY DOMAINE * (pour afficher tous les domaines)\n" +
                 "ASEHOY * (ancienne syntaxe pour afficher toutes les tables)"
             );
         }
         
-        // Extraire le type et la cible
-        String[] parts = query.substring(6).trim().split("\\s+", 2); // 6 = longueur de "ASEHOY"
+        String[] parts = query.substring(6).trim().split("\\s+", 2);
         
         if (parts.length == 1) {
-            // Ancienne syntaxe: ASEHOY *
             String target = parts[0].trim();
             if (target.equals("*")) {
                 return new ShowCommand("TABLE", "*");
@@ -455,8 +451,7 @@ public class MalgachQueryParser {
                 return new ShowCommand("TABLE", target);
             }
         } else if (parts.length == 2) {
-            // Nouvelle syntaxe: ASEHOY TABLE * ou ASEHOY DATABASE *
-            String type = parts[0].toUpperCase(); // TABLE ou DATABASE
+            String type = parts[0].toUpperCase();
             String target = parts[1].trim();
             
             if (target.isEmpty()) {
@@ -477,7 +472,6 @@ public class MalgachQueryParser {
         String query = malgachQuery.trim();
         String queryUpper = query.toUpperCase();
         
-        //AMPIASAO
         if (!queryUpper.startsWith("AMPIASAO")) {
             throw new IllegalArgumentException(
                 "Syntaxe USE invalide. Format:\n" +
@@ -485,8 +479,7 @@ public class MalgachQueryParser {
             );
         }
         
-        // Extraire le nom de la base de données après AMPIASAO
-        String dbName = query.substring(8).trim(); // 8 = longueur de "AMPIASAO"
+        String dbName = query.substring(8).trim();
         
         if (dbName.isEmpty()) {
             throw new IllegalArgumentException("Nom de la base de données manquant après 'AMPIASAO'");
@@ -503,7 +496,6 @@ public class MalgachQueryParser {
         String query = malgachQuery.trim();
         String queryUpper = query.toUpperCase();
         
-        // OVAY
         if (!queryUpper.startsWith("OVAY")) {
             throw new IllegalArgumentException(
                 "Syntaxe UPDATE invalide. Format:\n" +
@@ -512,16 +504,13 @@ public class MalgachQueryParser {
             );
         }
         
-        // @
         int atPos = queryUpper.indexOf("@");
         if (atPos == -1) {
             throw new IllegalArgumentException("Symbole '@' manquant dans la requête UPDATE");
         }
         
-        // après @
         String afterAt = query.substring(atPos + 1).trim();
         
-        // AMBOARY
         int amboaryPos = afterAt.toUpperCase().indexOf("AMBOARY");
         if (amboaryPos == -1) {
             throw new IllegalArgumentException("Mot-clé 'AMBOARY' manquant");
@@ -534,7 +523,6 @@ public class MalgachQueryParser {
             throw new IllegalArgumentException("Nom de la table manquant");
         }
         
-        // RAHA pour la condition
         int rahaPos = afterAmboary.toUpperCase().indexOf("RAHA");
         String setStr, condition = null;
         
@@ -589,7 +577,6 @@ public class MalgachQueryParser {
     private static AlterTableCommand parseAddColumn(String query) throws IllegalArgumentException {
         String queryUpper = query.toUpperCase();
         
-        // @
         int atPos = queryUpper.indexOf("@");
         if (atPos == -1) {
             throw new IllegalArgumentException("Symbole '@' manquant dans la requête ADD COLUMN");
@@ -597,7 +584,6 @@ public class MalgachQueryParser {
         
         String afterAt = query.substring(atPos + 1).trim();
         
-        // Premier espace pour séparer le nom de la table de la colonne
         int spacePos = afterAt.indexOf(" ");
         if (spacePos == -1) {
             throw new IllegalArgumentException("Format invalide: nom de colonne manquant");
@@ -633,25 +619,22 @@ public class MalgachQueryParser {
             throw new IllegalArgumentException("Domaine vide pour la colonne: " + columnName);
         }
         
-        // Créer l'attribut avec son domaine
-        Domaine domaine = Domaine.deserialize(columnName, domainSpec);
+    Domaine domaine = Domaine.deserialize(columnName, domainSpec);
         Attribut attribut = new Attribut(columnName, domaine);
         
         return new AlterTableCommand(AlterTableCommand.TYPE_ADD_COLUMN, tableStr, columnName, attribut);
-    }
+    }   
     
     private static AlterTableCommand parseDropColumn(String query) throws IllegalArgumentException {
         String queryUpper = query.toUpperCase();
         
-        // @
-        int atPos = queryUpper.indexOf("@");
+                        int atPos = queryUpper.indexOf("@");
         if (atPos == -1) {
             throw new IllegalArgumentException("Symbole '@' manquant dans la requête DROP COLUMN");
         }
         
         String afterAt = query.substring(atPos + 1).trim();
         
-        // Premier espace pour séparer le nom de la table de la colonne
         int spacePos = afterAt.indexOf(" ");
         if (spacePos == -1) {
             throw new IllegalArgumentException("Format invalide: nom de colonne manquant");
@@ -680,8 +663,7 @@ public class MalgachQueryParser {
         for (int i = 0; i < assignmentsStr.length(); i++) {
             char c = assignmentsStr.charAt(i);
             
-            // guillemets
-            if ((c == '"' || c == '\'') && (i == 0 || assignmentsStr.charAt(i - 1) != '\\')) {
+                        if ((c == '"' || c == '\'') && (i == 0 || assignmentsStr.charAt(i - 1) != '\\')) {
                 if (!inQuotes) {
                     inQuotes = true;
                     quoteChar = c;
@@ -692,8 +674,7 @@ public class MalgachQueryParser {
                     current.append(c);
                 }
             }
-            // virgules en dehors des quotes
-            else if (c == ',' && !inQuotes) {
+                        else if (c == ',' && !inQuotes) {
                 String assignment = current.toString().trim();
                 if (!assignment.isEmpty()) {
                     String[] parts = assignment.split("=", 2);
@@ -705,14 +686,12 @@ public class MalgachQueryParser {
                 }
                 current = new StringBuilder();
             }
-            // ajouter les autres caractères
-            else {
+                        else {
                 current.append(c);
             }
         }
         
-        // ajouter la dernière affectation
-        String assignment = current.toString().trim();
+                String assignment = current.toString().trim();
         if (!assignment.isEmpty()) {
             String[] parts = assignment.split("=", 2);
             if (parts.length != 2) {
@@ -723,5 +702,48 @@ public class MalgachQueryParser {
         }
         
         return result.toArray(new String[0]);
+    }
+    
+    public static CreateDomaineCommand parseCreateDomaine(String malgachQuery) throws IllegalArgumentException {
+        if (malgachQuery == null || malgachQuery.trim().isEmpty()) {
+            throw new IllegalArgumentException("Requête vide");
+        }
+        
+        String query = malgachQuery.trim();
+        String queryUpper = query.toUpperCase();
+        
+        // MAMORONA DOMAINE
+        if (!queryUpper.startsWith("MAMORONA DOMAINE")) {
+            throw new IllegalArgumentException(
+                "Syntaxe CREATE DOMAINE invalide. Format:\n" +
+                "MAMORONA DOMAINE nom @ Type|Range|Enum\n" +
+                "Exemples:\n" +
+                "MAMORONA DOMAINE AgeDomain @ Integer|0-120|\n" +
+                "MAMORONA DOMAINE StatusDomain @ String||ACTIF,INACTIF,SUSPENDU\n" +
+                "MAMORONA DOMAINE SalaireDomain @ Double|0-1000000|"
+            );
+        }
+        
+        String afterCmd = query.substring(16).trim(); 
+        
+        int atPos = afterCmd.indexOf("@");
+        if (atPos == -1) {
+            throw new IllegalArgumentException("Symbole '@' manquant dans la requête CREATE DOMAINE");
+        }
+        
+        String domaineName = afterCmd.substring(0, atPos).trim();
+        String domainSpec = afterCmd.substring(atPos + 1).trim();
+        
+        if (domaineName.isEmpty()) {
+            throw new IllegalArgumentException("Nom du domaine manquant");
+        }
+        
+        if (domainSpec.isEmpty()) {
+            throw new IllegalArgumentException("Spécification du domaine manquante après '@'");
+        }
+        
+        Domaine domaine = Domaine.deserialize(domaineName, domainSpec);
+        
+        return new CreateDomaineCommand(domaineName, domaine);
     }
 }

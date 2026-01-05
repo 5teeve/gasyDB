@@ -7,13 +7,7 @@ import java.util.List;
 import java.util.Map;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
-import controlleur.AlterTableCommand;
-import controlleur.CreateCommand;
-import controlleur.DeleteCommand;
-import controlleur.InsertCommand;
-import controlleur.QueryCommand;
-import controlleur.ShowCommand;
-import controlleur.UpdateCommand;
+import model.Domaine;
 import model.Relation;
 import service.DatabaseService;
 import service.QueryService;
@@ -33,6 +27,10 @@ public class QueryController {
         DataPersistence persistence = new DataPersistence();
         this.tableService = new TableService(persistence);
         this.queryService = new QueryService(tableService, databaseService, persistence);
+        
+        // Initialiser le DomaineService dans le MalgachQueryParser
+        MalgachQueryParser.setDomaineService(queryService.getDomaineService());
+        
         initListeners();
         loadInitialData();
         updateDatabaseDisplay();
@@ -46,6 +44,9 @@ public class QueryController {
         String dbName = databaseService.getCurrentDatabase();
         tableService.setCurrentDatabase(dbName);
         tableService.loadAllTables();
+        
+        queryService.getDomaineService().setCurrentDatabase(dbName);
+        queryService.getDomaineService().loadDomaines();
     }
     
     private void updateDatabaseDisplay() {
@@ -54,6 +55,9 @@ public class QueryController {
             view.setDatabaseName(dbName);
             tableService.setCurrentDatabase(dbName);
             tableService.loadAllTables();
+            
+            queryService.getDomaineService().setCurrentDatabase(dbName);
+            queryService.getDomaineService().loadDomaines();
         });
     }
     
@@ -89,7 +93,10 @@ public class QueryController {
                     } else if (result instanceof Map) {
                         @SuppressWarnings("unchecked")
                         Map<String, ?> resultMap = (Map<String, ?>) result;
-                        if (!resultMap.isEmpty() && resultMap.values().iterator().next() instanceof Relation) {
+                        if (!resultMap.isEmpty() && resultMap.values().iterator().next() instanceof Domaine) {
+                            Map<String, Domaine> domainesMap = (Map<String, Domaine>) result;
+                            displayDomainesInUI(domainesMap);
+                        } else if (!resultMap.isEmpty() && resultMap.values().iterator().next() instanceof Relation) {
                             @SuppressWarnings("unchecked")
                             Map<String, Relation> tablesMap = (Map<String, Relation>) result;
                             displayTablesInUI(tablesMap);
@@ -128,6 +135,10 @@ public class QueryController {
             InsertCommand cmd = MalgachQueryParser.parseInsert(query);
             queryService.executeInsert(cmd);
             return "Insertion effectuée avec succès";
+        } else if (MalgachQueryParser.isCreateDomaineQuery(query)) {
+            CreateDomaineCommand cmd = MalgachQueryParser.parseCreateDomaine(query);
+            queryService.executeCreateDomaine(cmd);
+            return "Domaine créé avec succès";
         } else if (MalgachQueryParser.isCreateQuery(query)) {
             try {
                 CreateCommand cmd = MalgachQueryParser.parseCreate(query);
@@ -167,6 +178,8 @@ public class QueryController {
             UpdateCommand cmd = MalgachQueryParser.parseUpdate(query);
             queryService.executeUpdate(cmd);
             return "Mise à jour effectuée avec succès";
+        } else if (isShowDomainesQuery(query)) {
+            return queryService.executeShowDomaines();
         } else {
             throw new IllegalArgumentException("Requête non reconnue");
         }
@@ -379,6 +392,54 @@ public class QueryController {
             
             view.addResultsPanel(errorPanel);
             view.setStatus("Erreur: " + title);
+        });
+    }
+    
+    private boolean isShowDomainesQuery(String query) {
+        return query != null && query.trim().toUpperCase().equals("ASEHOY DOMAINE *");
+    }
+    
+    private void displayDomainesInUI(Map<String, Domaine> domaines) {
+        SwingUtilities.invokeLater(() -> {
+            JPanel domainesPanel = new JPanel(new BorderLayout(10, 10));
+            domainesPanel.setBackground(new Color(245, 247, 250));
+            
+            if (domaines.isEmpty()) {
+                JLabel titleLabel = new JLabel("Aucun domaine trouvé dans cette base de données");
+                titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+                titleLabel.setForeground(new Color(150, 50, 50));
+                JPanel titlePanel = new JPanel();
+                titlePanel.setBackground(new Color(245, 247, 250));
+                titlePanel.add(titleLabel);
+                domainesPanel.add(titlePanel, BorderLayout.CENTER);
+            } else {
+                JLabel titleLabel = new JLabel("Domaines trouvés: " + domaines.size());
+                titleLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
+                titleLabel.setForeground(new Color(50, 100, 150));
+                JPanel titlePanel = new JPanel();
+                titlePanel.setBackground(new Color(245, 247, 250));
+                titlePanel.add(titleLabel);
+                domainesPanel.add(titlePanel, BorderLayout.NORTH);
+                
+                JTextArea listArea = new JTextArea();
+                listArea.setEditable(false);
+                listArea.setBackground(Color.WHITE);
+                listArea.setForeground(Color.BLACK);
+                
+                for (String domaineName : domaines.keySet()) {
+                    Domaine domaine = domaines.get(domaineName);
+                    listArea.append("• " + domaineName + ": " + domaine.toString() + "\n");
+                }
+                
+                listArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+                listArea.setBorder(javax.swing.BorderFactory.createEmptyBorder(15, 15, 15, 15));
+                
+                JScrollPane scrollPane = new JScrollPane(listArea);
+                scrollPane.setBorder(javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10));
+                domainesPanel.add(scrollPane, BorderLayout.CENTER);
+            }
+            
+            view.addResultsPanel(domainesPanel);
         });
     }
 }

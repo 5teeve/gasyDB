@@ -1,4 +1,0 @@
-1|Alice|Développeur
-2|Bob|Manager
-3|Charlie|Analyste
-4|Rakoto|Chomeur

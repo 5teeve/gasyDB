@@ -2,6 +2,7 @@ package service;
 
 import controlleur.AlterTableCommand;
 import controlleur.CreateCommand;
+import controlleur.CreateDomaineCommand;
 import controlleur.DeleteCommand;
 import controlleur.InsertCommand;
 import controlleur.QueryCommand;
@@ -15,12 +16,14 @@ import utils.DataPersistence;
 public class QueryService {
     private TableService tableService;
     private DatabaseService databaseService;
+    private DomaineService domaineService;
     private DataPersistence persistence;
     
     public QueryService(TableService tableService, DatabaseService databaseService, DataPersistence persistence) {
         this.tableService = tableService;
         this.databaseService = databaseService;
         this.persistence = persistence;
+        this.domaineService = new DomaineService(persistence);
     }
     
     public Object executeSelect(QueryCommand cmd) throws Exception {
@@ -66,7 +69,6 @@ public class QueryService {
         Object[] tuple = convertValuesToObjects(cmd.valeurs, colonnesAUtiliser, r);
         r.ajouterTuple(tuple);
         
-        // Persister l'insertion
         persistence.saveInsert(cmd.table, colonnesAUtiliser, cmd.valeurs, getCurrentDatabasePath());
     }
     
@@ -98,8 +100,9 @@ public class QueryService {
     
     public void executeUse(String dbName) throws Exception {
         databaseService.useDatabase(dbName);
-        // Recharger les tables depuis la nouvelle base de données
+        domaineService.setCurrentDatabase(dbName);
         tableService.loadAllTables();
+        domaineService.loadDomaines();
     }
     
     public Object executeShow(ShowCommand cmd) throws Exception {
@@ -122,6 +125,12 @@ public class QueryService {
                     throw new IllegalArgumentException("Base de données '" + cmd.target + "' introuvable");
                 }
                 return "Base de données '" + cmd.target + "' existe";
+            }
+        } else if ("DOMAINE".equals(cmd.type)) {
+            if (cmd.showAll) {
+                return domaineService.getAllDomaines();
+            } else {
+                throw new IllegalArgumentException("Syntaxe invalide. Utilisez: ASEHOY DOMAINE *");
             }
         } else {
             throw new IllegalArgumentException("Type de commande SHOW non supporté: " + cmd.type);
@@ -273,5 +282,17 @@ public class QueryService {
                 "Cannot convert '" + val + "' to " + expectedType.getSimpleName()
             );
         }
+    }
+    
+    public void executeCreateDomaine(CreateDomaineCommand cmd) throws Exception {
+        domaineService.createDomaine(cmd.name, cmd.domaine);
+    }
+    
+    public Object executeShowDomaines() throws Exception {
+        return domaineService.getAllDomaines();
+    }
+    
+    public DomaineService getDomaineService() {
+        return domaineService;
     }
 }

@@ -14,6 +14,21 @@ MAMORONA TABLE Employes @ Age(Integer|0-120|) Name(String||) Salaire(Double|0-10
 MAMORONA DATABASE Entreprise
 MAMORONA TABLE Clients @ Nom(String||) Email(String||)
 
+## CREATE DOMAIN (MAMORONA DOMAINE)
+MAMORONA DOMAINE AgeDomain @ Integer|0-120|
+MAMORONA DOMAINE StatusDomain @ String||ACTIF,INACTIF,SUSPENDU
+MAMORONA DOMAINE SalaireDomain @ Double|0-1000000|
+
+## Utilisation des domaines dans les tables
+MAMORONA TABLE Employes @ Age(AgeDomain) Name(String||) Salaire(SalaireDomain) Status(StatusDomain)
+
+## SHOW (ASEHOY)
+ASEHOY TABLE *
+ASEHOY TABLE Employes
+ASEHOY DATABASE *
+ASEHOY DATABASE Entreprise
+ASEHOY DOMAINE *
+
 ## DELETE (FAFAO)
 FAFAO @ Employes
 FAFAO DATABASE TestDB

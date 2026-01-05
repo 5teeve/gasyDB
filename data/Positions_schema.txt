@@ -1,2 +1,0 @@
-ID|Name|Poste
-Integer|||String|||String||
